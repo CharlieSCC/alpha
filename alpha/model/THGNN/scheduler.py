@@ -10,6 +10,23 @@ from alpha.model.THGNN.dataset import *
 from alpha.model.THGNN.model import *
 
 
+def set_logger(logger):
+    handler1 = logging.StreamHandler()
+    handler2 = logging.FileHandler(filename=logger.name)
+
+    logger.setLevel(logging.INFO)
+    handler1.setLevel(logging.INFO)
+    handler2.setLevel(logging.INFO)
+
+    formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+    handler1.setFormatter(formatter)
+    handler2.setFormatter(formatter)
+
+    logger.addHandler(handler1)
+    logger.addHandler(handler2)
+    return logger
+
+
 class THGNN_scheduler:
     def __init__(self,
                  name,
@@ -35,6 +52,7 @@ class THGNN_scheduler:
         if not os.path.exists(os.path.join(DATA_PATH, name)):
             os.makedirs(os.path.join(DATA_PATH, name))
         self.logger = logging.getLogger(os.path.join(DATA_PATH, name, "task.log"))
+        self.logger = set_logger(self.logger)
         self.train_len = train_len
         self.valid_len = valid_len
         self.look_back_window = look_back_window
@@ -88,17 +106,17 @@ class THGNN_scheduler:
         num_patience = 0
         for i in range(self.epochs):
             train_loss, train_metric = self.train_epoch(model, train_dataloader, optimizer, "train")
-            self.logger.info("LOSS {} | METRIC {.3f}".format(train_loss, train_metric))
+            self.logger.info("EPOCH {}: LOSS {} | METRIC {:.3f}".format(i, train_loss, train_metric))
             valid_loss, valid_metric = self.train_epoch(model, valid_dataloader, optimizer, "valid")
-            self.logger.info("LOSS {} | METRIC {.3f}".format(valid_loss, valid_metric))
+            self.logger.info("EPOCH {}: LOSS {} | METRIC {:.3f}".format(i, valid_loss, valid_metric))
             if best_metric < valid_metric:
                 num_patience = 0
                 best_metric = valid_metric
                 best_model = copy.deepcopy(model)
-                self.logger.info("EPOCH {}: BEST METRIC {.3f}".format(i, valid_metric))
+                self.logger.info("EPOCH {}: BEST METRIC {:.3f}".format(i, valid_metric))
             else:
                 num_patience += 1
-                self.logger.info("EPOCH {}: NUM PATIENCE {.3f}".format(i, num_patience))
+                self.logger.info("EPOCH {}: NUM PATIENCE {:.3f}".format(i, num_patience))
             if num_patience >= self.max_patience:
                 break
         with open(os.path.join(DATA_PATH, self.name, "model_{}_{}").format(srt_date, end_date)) as f:
@@ -155,7 +173,7 @@ if __name__ == "__main__":
                 name="THGNN_0.0.1",
                 train_len=60,
                 valid_len=30,
-                look_back_window=5,
+                look_back_window=20,
                 factor_list=["alphas_101_alpha_001", "alphas_101_alpha_003"],
                 universe_version="zz800",
                 label_df=opn_r,
@@ -168,7 +186,7 @@ if __name__ == "__main__":
                 weight_decay=0.0001,
                 epochs=20,
                 max_patience=5)
-    thgnn.train("20200101", "20201221")
+    thgnn.train("20210101", "20211221")
 
 
 
