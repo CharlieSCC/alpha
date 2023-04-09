@@ -62,30 +62,6 @@ class Args:
         self.sub_task = subtask
         eval("self.{}".format(self.sub_task))()
 
-    def regression(self):
-        self.save_name = self.save_name + "_reg_rank_"
-        self.loss_fcn = mse_loss
-        self.label_dir = self.label_dir + "_regression"
-        self.mask_dir = self.mask_dir + "_regression"
-
-    def regression_binary(self):
-        self.save_name = self.save_name + "_reg_binary_"
-        self.loss_fcn = mse_loss
-        self.label_dir = self.label_dir + "_twoclass"
-        self.mask_dir = self.mask_dir + "_twoclass"
-
-    def classification_binary(self):
-        self.save_name = self.save_name + "_clas_binary_"
-        self.loss_fcn = bce_loss
-        self.label_dir = self.label_dir + "_twoclass"
-        self.mask_dir = self.mask_dir + "_twoclass"
-
-    def classification_tertiary(self):
-        self.save_name = self.save_name + "_clas_tertiary_"
-        self.loss_fcn = bce_loss
-        self.label_dir = self.label_dir + "_threeclass"
-        self.mask_dir = self.mask_dir + "_threeclass"
-
 
 
 
@@ -107,15 +83,6 @@ def evaluate(model, features, adj_pos, adj_neg, labels, mask, loss_func=nn.MSELo
         logits = model(features, adj_pos, adj_neg)
     loss = loss_func(logits[mask], labels[mask])
     return loss, logits
-
-
-def extract_data(data_dict, device):
-    pos_adj = data_dict['pos_adj'].to(device).squeeze()
-    neg_adj = data_dict['neg_adj'].to(device).squeeze()
-    features = data_dict['features'].to(device).squeeze()
-    labels = data_dict['labels'].to(device).squeeze()
-    mask = data_dict['mask']
-    return pos_adj, neg_adj, features, labels, mask
 
 
 def train_epoch(epoch, args, model, dataset_train, optimizer, scheduler, loss_fcn):

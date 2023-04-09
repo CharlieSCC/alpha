@@ -156,7 +156,6 @@ class THGNN(nn.Module):
         x_downstream = self.nn_downstream(x_downstream)
         x = torch.stack((x, x_upstream, x_downstream), dim=1)
         x, heterogeneous_attention = self.Heterogeneous_GAT(x, require_weight)
-        print(heterogeneous_attention)
         x = self.pair_norm(x)
         if require_weight:
             return self.predictor(x).squeeze(), (attention_upstream, attention_downstream, heterogeneous_attention)
