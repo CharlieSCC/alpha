@@ -48,8 +48,6 @@ class TabularDataset(Dataset):
     def __getitem__(self, idx):
         data = self.factor_data[:, idx: idx + self.look_back_window, :]
         date = self.trade_dates.iloc[idx]
-        graph = pd.read_hdf(
-            os.path.join(DATA_PATH, "Ashare_data/graph_data/adjacent_matrix_{}.h5".format(str(date[:4]))), key="graph")
         stock_id = pd.read_hdf(os.path.join(DATA_PATH, "Ashare_data/basic_data/stock_id.h5"), key="stock_id")
         label = self.label_df.loc[date]
 
