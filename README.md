@@ -1,4 +1,4 @@
-# Data, Factor, Model and Backtest
+# Data, Factor, Model and Evaluate
 
 ### Data
     All data must be BOD. 
@@ -19,7 +19,18 @@
     Now we only include pv factor, which is published in alpha 101.
 
 ### Model
+    Recurrent Model:
+    - LSTM
+    - GRU
+    - Transformer
+    
+    Graph Model
+    - LSTM_GCN
+    - TGC
+    - HATS
     - THGNN
     
-### Backtest
-    TBA
+### Evaluate
+    - eval.py:            Basic Metrics for Finacial Prediction 
+    - backtest.py:        Backtest for Model Signal
+    - attention_plot.py:  Attention Weights Plotting
