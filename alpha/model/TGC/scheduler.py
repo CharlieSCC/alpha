@@ -6,8 +6,8 @@ import logging
 import copy
 import pickle
 from torch.utils.data import DataLoader
-from alpha.model.THGNN.dataset import *
-from alpha.model.THGNN.model import *
+from alpha.model.TGC.dataset import *
+from alpha.model.TGC.model import *
 
 
 def set_logger(logger):
@@ -27,7 +27,7 @@ def set_logger(logger):
     return logger
 
 
-class THGNN_scheduler:
+class TGC_scheduler:
     def __init__(self,
                  name,
                  train_len,
@@ -46,7 +46,7 @@ class THGNN_scheduler:
                  epochs,
                  max_patience
                  ):
-        super(THGNN_scheduler).__init__()
+        super(TGC_scheduler).__init__()
         self.name = name
 
         if not os.path.exists(os.path.join(DATA_PATH, name)):
@@ -75,7 +75,7 @@ class THGNN_scheduler:
     def get_date(date, num):
         trade_dates = pd.read_hdf(os.path.join(DATA_PATH, "Ashare_data/basic_data/trade_dates.h5"), key="trade_dates")
         idx = max(trade_dates[trade_dates <= date].index)
-        return trade_dates.iloc[idx-num]
+        return trade_dates.iloc[idx - num]
 
     def train(self, srt_date, end_date):
         train_srt_date = self.get_date(srt_date, self.train_len)
@@ -97,7 +97,7 @@ class THGNN_scheduler:
                                      self.universe_version)
         train_dataloader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         valid_dataloader = DataLoader(valid_dataset, batch_size=self.batch_size, shuffle=False)
-        model = THGNN(len(self.factor_list), self.hidden_size, self.mum_layers, self.out_features, self.num_heads)
+        model = TGC(len(self.factor_list), self.hidden_size, self.mum_layers, self.out_features, self.num_heads)
         if self.is_gpu:
             model.cuda()
         optimizer = torch.optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
@@ -133,19 +133,14 @@ class THGNN_scheduler:
         stock_id_list = []
         date_list = []
         for x, y, graph, date, stock_id in tqdm(loader):
-            y = (y.squeeze() - torch.mean(y.squeeze()))/torch.std(y.squeeze())
-            upstream = copy.deepcopy(graph.squeeze())
-            upstream[upstream <= 0] = 0
-            upstream[upstream > 0] = 1
-            downstream = copy.deepcopy(graph.squeeze())
-            downstream[downstream >= 0] = 0
-            downstream[downstream < 0] = 1
+            y = (y.squeeze() - torch.mean(y.squeeze())) / torch.std(y.squeeze())
+            adj_matrix = copy.deepcopy(graph.squeeze())
+            adj_matrix[adj_matrix != 0] = 1
             if self.is_gpu:
                 x = x.squeeze().cuda()
                 y = y.squeeze().cuda()
-                upstream = upstream.cuda()
-                downstream = downstream.cuda()
-            y_pred, _ = model(x.float(), upstream.float(), downstream.float(), True)
+                adj_matrix = adj_matrix.cuda()
+            y_pred, _ = model(x.float(), adj_matrix.float(), True)
             loss = self.loss_fn(y.float(), y_pred)
             if mode == "train":
                 loss.backward()
@@ -162,7 +157,7 @@ class THGNN_scheduler:
             "y_pred": y_pred_list
         })
         ic = info_df.groupby("date").apply(lambda dd: dd[["y", "y_pred"]].corr().loc["y", "y_pred"]).mean()
-        return total_loss/len(loader), ic
+        return total_loss / len(loader), ic
 
     def predict(self, srt_date, end_date):
         with open(os.path.join(DATA_PATH, self.name, "model_{}_{}").format(srt_date, end_date)) as f:
@@ -183,19 +178,14 @@ class THGNN_scheduler:
         stock_id_list = []
         date_list = []
         for x, y, graph, date, stock_id in tqdm(test_dataloader):
-            y = (y.squeeze() - torch.mean(y.squeeze()))/torch.std(y.squeeze())
-            upstream = copy.deepcopy(graph.squeeze())
-            upstream[upstream <= 0] = 0
-            upstream[upstream > 0] = 1
-            downstream = copy.deepcopy(graph.squeeze())
-            downstream[downstream >= 0] = 0
-            downstream[downstream < 0] = 1
+            y = (y.squeeze() - torch.mean(y.squeeze())) / torch.std(y.squeeze())
+            adj_matrix = copy.deepcopy(graph.squeeze())
+            adj_matrix[adj_matrix != 0] = 1
             if self.is_gpu:
                 x = x.squeeze().cuda()
                 y = y.squeeze().cuda()
-                upstream = upstream.cuda()
-                downstream = downstream.cuda()
-            y_pred, _ = best_model(x.float(), upstream.float(), downstream.float(), True)
+                adj_matrix = adj_matrix.cuda()
+            y_pred, _ = best_model(x.float(), adj_matrix.float(), True)
             loss = self.loss_fn(y.float(), y_pred)
             total_loss += loss.data
             y_list.extend(y.squeeze().detach().cpu().numpy().tolist())
@@ -210,35 +200,4 @@ class THGNN_scheduler:
             "y_pred": y_pred_list
         })
         ic = info_df.groupby("date").apply(lambda dd: dd[["y", "y_pred"]].corr().loc["y", "y_pred"]).mean()
-        return total_loss/len(test_dataloader), ic, info_df
-
-
-if __name__ == "__main__":
-    opn = pd.read_hdf(os.path.join(DATA_PATH, "Ashare_data/1day_data/pv.h5"), key="open")
-    opn_r = opn.pct_change()
-    opn_r = opn_r.shift(-2)
-    thgnn = THGNN_scheduler(
-                name="THGNN_0.0.1",
-                train_len=252*5,
-                valid_len=252,
-                look_back_window=20,
-                factor_list=["alphas_101_alpha_001", "alphas_101_alpha_003"],
-                universe_version="zz800",
-                label_df=opn_r,
-                batch_size=1,
-                hidden_size=8,
-                num_heads=4,
-                out_features=8,
-                num_layers=1,
-                lr=0.001,
-                weight_decay=0.0001,
-                epochs=20,
-                max_patience=5)
-    thgnn.train("20210101", "20211221")
-
-
-
-
-
-
-
+        return total_loss / len(test_dataloader), ic, info_df

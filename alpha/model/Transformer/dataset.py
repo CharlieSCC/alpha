@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 from alpha.config.config import *
 
 
-class GraphDataset(Dataset):
+class TabularDataset(Dataset):
     def __init__(self,
                  srt_date,
                  end_date,
@@ -21,7 +21,8 @@ class GraphDataset(Dataset):
         self.look_back_window = look_back_window
         self.factor_list = factor_list
         self.factor_data = self._load_data()
-        self.universe_df = pd.read_hdf(os.path.join(DATA_PATH, "Ashare_data/basic_data/{}.h5".format(universe_version)),
+        self.universe_df = pd.read_hdf(os.path.join(DATA_PATH,
+                                                    "Ashare_data/basic_data/{}.h5".format(universe_version)),
                                        key="{}".format(universe_version))
 
     @staticmethod
@@ -59,9 +60,8 @@ class GraphDataset(Dataset):
 
         data = data[mask]
         stock_id = list(stock_id[mask])
-        graph = graph.loc[stock_id, stock_id].replace(np.nan, 0).values
         label = label[mask].values
-        return [data, label, graph, [date for _ in range(len(label))], stock_id]
+        return [data, label, [date for _ in range(len(label))], stock_id]
         # return {
         #     "data": data,
         #     "label": label,

@@ -83,34 +83,15 @@ class PairNorm(nn.Module):
         return x
 
 
-class HeterogeneousGATLayer(nn.Module):
-    def __init__(self,
-                 input_size,
-                 hidden_size,):
-        super(HeterogeneousGATLayer, self).__init__()
-        self.w = nn.Sequential(nn.Linear(input_size, hidden_size),
-                               nn.Tanh(),
-                               nn.Linear(hidden_size, 1, bias=False))
 
-    def forward(self,
-                inputs,
-                require_weight=False):
-        attention = self.w(inputs)
-        attention = torch.softmax(attention, dim=1)
-        if require_weight:
-            return torch.mul(attention, inputs).sum(dim=1), attention.squeeze()
-        else:
-            return torch.mul(attention, inputs).sum(dim=1)
-
-
-class THGNN(nn.Module):
+class TGC(nn.Module):
     def __init__(self,
                  input_size,
                  hidden_size,
                  num_layers,
                  out_features,
                  num_heads):
-        super(THGNN, self).__init__()
+        super(TGC, self).__init__()
         self.encoding = nn.GRU(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -118,22 +99,13 @@ class THGNN(nn.Module):
             batch_first=True,
             dropout=0.1
         )
-        self.upstream_GAT = GATLayer(
+        self.GAT = GATLayer(
             in_features=hidden_size,
             out_features=out_features,
             num_heads=num_heads
         )
-        self.downstream_GAT = GATLayer(
-            in_features=hidden_size,
-            out_features=out_features,
-            num_heads=num_heads
-        )
-        self.nn_self = nn.Linear(hidden_size, hidden_size)
-        self.nn_upstream = nn.Linear(out_features * num_heads, hidden_size)
-        self.nn_downstream = nn.Linear(out_features * num_heads, hidden_size)
+        self.linear = nn.Linear(out_features * num_heads, hidden_size)
         self.pair_norm = PairNorm(mode='PN')
-        self.Heterogeneous_GAT = HeterogeneousGATLayer(hidden_size,
-                                                       hidden_size)
         self.predictor = nn.Sequential(
             nn.Linear(hidden_size, 1),
             # nn.Sigmoid()
@@ -141,23 +113,13 @@ class THGNN(nn.Module):
 
     def forward(self,
                 inputs,
-                upstream_adj,
-                downstream_adj,
+                adj_matrix,
                 require_weight):
         _, x = self.encoding(inputs)
-        x_upstream, attention_upstream = self.upstream_GAT(x.squeeze(),
-                                                           upstream_adj,
-                                                           require_weight)
-        x_downstream, attention_downstream = self.downstream_GAT(x.squeeze(),
-                                                                 downstream_adj,
-                                                                 require_weight)
-        x = self.nn_self(x.squeeze())
-        x_upstream = self.nn_upstream(x_upstream)
-        x_downstream = self.nn_downstream(x_downstream)
-        x = torch.stack((x, x_upstream, x_downstream), dim=1)
-        x, heterogeneous_attention = self.Heterogeneous_GAT(x, require_weight)
+        x, att = self.GAT(x.squeeze(), adj_matrix, require_weight)
+        x = self.linear(x)
         x = self.pair_norm(x)
         if require_weight:
-            return self.predictor(x).squeeze(), (attention_upstream, attention_downstream, heterogeneous_attention)
+            return self.predictor(x).squeeze(), att
         else:
             return self.predictor(x).squeeze()

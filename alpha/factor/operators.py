@@ -3,6 +3,14 @@ import pandas as pd
 from scipy.stats import rankdata
 
 
+def binary_max(df_1, df_2):
+    return df_2.mask(df_1 > df_2, df_1)
+
+
+def binary_min(df_1, df_2):
+    return df_2.mask(df_1 < df_2, df_1)
+
+
 def log(df: pd.DataFrame):
     """
     Parameters
