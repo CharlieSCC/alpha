@@ -10,4 +10,4 @@ class Underlying:
 
     def load_data(self):
         for key in DATA_KEYS:
-            self.data[key] = pd.read_hdf(os.path.join(DATA_PATH, "Ashare_data/1day_data/pv.h5"), key=key)
+            self.data[key] = pd.read_hdf(os.path.join(DATA_PATH, "Ashare_data/1day_data/pv_ffill.h5"), key=key)

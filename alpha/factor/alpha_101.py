@@ -855,6 +855,5 @@ if __name__ == "__main__":
     from alpha.data.underlying import *
     u = Underlying()
     alphas_101 = Alphas101("alphas_101")
-    alpha_names = ["alpha_003", "alpha_101"]
-    # alphas_101.cal_alphas(u, alpha_names=alpha_names, n_jobs=4)
-    alphas_101.tst_alphas(alpha_names=alpha_names)
+    alphas_101.cal_alphas(u, n_jobs=4)
+    # alphas_101.tst_alphas(alpha_names=alpha_names)

@@ -1,10 +1,8 @@
 import torch
 from torch import nn
 import math
-
 from torch.nn.parameter import Parameter
 from torch.nn.modules.module import Module
-
 
 class GraphConvolution(Module):
     """
@@ -61,7 +59,6 @@ class PairNorm(nn.Module):
         return x
 
 
-
 class lstm_gcn(nn.Module):
     def __init__(self,
                  input_size,
@@ -74,24 +71,20 @@ class lstm_gcn(nn.Module):
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,
-            dropout=0.1
         )
         self.gcn = GraphConvolution(
             in_features=hidden_size,
             out_features=out_features,
         )
-        self.linear = nn.Linear(hidden_size, hidden_size)
-        self.pair_norm = PairNorm(mode='PN')
+        self.pair_norm = PairNorm(mode='PN-SCS')
         self.predictor = nn.Sequential(
-            nn.Linear(hidden_size, 1),
-            # nn.Sigmoid()
+            nn.Linear(out_features, 1),
         )
 
     def forward(self,
                 inputs,
                 adj_matrix,):
-        _, x = self.encoding(inputs)
-        x = self.gcn(x.squeeze(), adj_matrix)
-        x = self.linear(x.squeeze())
-        x = self.pair_norm(x)
-        return self.predictor(x).squeeze()
+        x, _ = self.encoding(inputs)
+        x = self.gcn(x[:, -1, :].squeeze(), adj_matrix)
+        #x = self.pair_norm(x)
+        return self.predictor(x.squeeze()).squeeze()

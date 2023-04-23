@@ -102,9 +102,9 @@ class gru_scheduler:
         num_patience = 0
         for i in range(self.epochs):
             train_loss, train_metric = self.train_epoch(model, train_dataloader, optimizer, "train")
-            self.logger.info("EPOCH {}: LOSS {} | METRIC {:.3f}".format(i, train_loss, train_metric))
+            self.logger.info("EPOCH {}: LOSS {:.6f} | METRIC {:.3f}".format(i, train_loss, train_metric))
             valid_loss, valid_metric = self.train_epoch(model, valid_dataloader, optimizer, "valid")
-            self.logger.info("EPOCH {}: LOSS {} | METRIC {:.3f}".format(i, valid_loss, valid_metric))
+            self.logger.info("EPOCH {}: LOSS {:.6f} | METRIC {:.3f}".format(i, valid_loss, valid_metric))
             if best_metric < valid_metric:
                 num_patience = 0
                 best_metric = valid_metric
@@ -115,7 +115,9 @@ class gru_scheduler:
                 self.logger.info("EPOCH {}: NUM PATIENCE {:.3f}".format(i, num_patience))
             if num_patience >= self.max_patience:
                 break
-        with open(os.path.join(DATA_PATH, self.name, "model_{}_{}").format(srt_date, end_date)) as f:
+        if not os.path.exists(os.path.join(DATA_PATH, self.name,)):
+            os.makedirs(os.path.join(DATA_PATH, self.name,))
+        with open(os.path.join(DATA_PATH, self.name, "model_{}_{}.pkl").format(srt_date, end_date), "wb") as f:
             pickle.dump(best_model, f)
 
     def train_epoch(self, model, loader, optimizer, mode):
@@ -129,13 +131,15 @@ class gru_scheduler:
         stock_id_list = []
         date_list = []
         for x, y, date, stock_id in tqdm(loader):
-            y = (y.squeeze() - torch.mean(y.squeeze()))/torch.std(y.squeeze())
+            x = (x.squeeze() - torch.mean(x.squeeze(), dim=0, keepdim=True)) / (torch.std(x.squeeze(), dim=0, keepdim=True) + 1e-6)
+            y = (y.squeeze() - torch.mean(y.squeeze()))/(torch.std(y.squeeze()) + 1e-6)
             if self.is_gpu:
                 x = x.squeeze().cuda()
                 y = y.squeeze().cuda()
-            y_pred, _ = model(x.float())
+            y_pred = model(x.float())
             loss = self.loss_fn(y.float(), y_pred)
             if mode == "train":
+                optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
             total_loss += loss.data
@@ -149,11 +153,13 @@ class gru_scheduler:
             "y": y_list,
             "y_pred": y_pred_list
         })
+        info_df["date"] = info_df["date"].astype(str).str[2:-3]
+        info_df["stock_id"] = info_df["stock_id"].astype(str).str[2:-3]
         ic = info_df.groupby("date").apply(lambda dd: dd[["y", "y_pred"]].corr().loc["y", "y_pred"]).mean()
         return total_loss/len(loader), ic
 
     def predict(self, srt_date, end_date):
-        with open(os.path.join(DATA_PATH, self.name, "model_{}_{}").format(srt_date, end_date)) as f:
+        with open(os.path.join(DATA_PATH, self.name, "model_{}_{}.pkl").format(srt_date, end_date), "rb") as f:
             best_model = pickle.load(f)
         test_dataset = TabularDataset(srt_date,
                                       end_date,
@@ -166,19 +172,23 @@ class gru_scheduler:
             best_model.cuda()
         best_model.eval()
         total_loss = 0
+        ret_list = []
         y_list = []
         y_pred_list = []
         stock_id_list = []
         date_list = []
         for x, y, date, stock_id in tqdm(test_dataloader):
-            y = (y.squeeze() - torch.mean(y.squeeze()))/torch.std(y.squeeze())
+
+            x = (x.squeeze() - torch.mean(x.squeeze(), dim=0, keepdim=True)) / (torch.std(x.squeeze(), dim=0, keepdim=True) + 1e-6)
+            y_ = (y.squeeze() - torch.mean(y.squeeze()))/(torch.std(y.squeeze()) + 1e-6)
             if self.is_gpu:
                 x = x.squeeze().cuda()
-                y = y.squeeze().cuda()
-            y_pred, _ = best_model(x.float())
-            loss = self.loss_fn(y.float(), y_pred)
+                y_ = y_.squeeze().cuda()
+            y_pred = best_model(x.float())
+            loss = self.loss_fn(y_.float(), y_pred)
             total_loss += loss.data
-            y_list.extend(y.squeeze().detach().cpu().numpy().tolist())
+            ret_list.extend(y.squeeze().cpu().numpy().tolist())
+            y_list.extend(y_.squeeze().detach().cpu().numpy().tolist())
             y_pred_list.extend(y_pred.squeeze().detach().cpu().numpy().tolist())
             stock_id_list.extend(stock_id)
             date_list.extend(date)
@@ -186,9 +196,13 @@ class gru_scheduler:
             "date": date_list,
             "stock_id": stock_id_list,
             "y": y_list,
-            "y_pred": y_pred_list
+            "y_pred": y_pred_list,
+            "ret": ret_list
         })
+        info_df["date"] = info_df["date"].astype(str).str[2:-3]
+        info_df["stock_id"] = info_df["stock_id"].astype(str).str[2:-3]
         ic = info_df.groupby("date").apply(lambda dd: dd[["y", "y_pred"]].corr().loc["y", "y_pred"]).mean()
+        info_df.to_csv(os.path.join(DATA_PATH, self.name, "info_{}_{}.csv").format(srt_date, end_date))
         return total_loss/len(test_dataloader), ic, info_df
 
 

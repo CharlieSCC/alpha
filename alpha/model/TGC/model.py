@@ -2,7 +2,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-
 class GATLayer(nn.Module):
     def __init__(self,
                  in_features,
@@ -81,8 +80,6 @@ class PairNorm(nn.Module):
         else:
             raise "No such a mode!"
         return x
-
-
 
 class TGC(nn.Module):
     def __init__(self,

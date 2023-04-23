@@ -66,7 +66,6 @@ class HeterogeneousGATLayer(nn.Module):
                  hidden_size,):
         super(HeterogeneousGATLayer, self).__init__()
         self.w = nn.Sequential(nn.Linear(input_size, hidden_size),
-                               nn.Tanh(),
                                nn.Linear(hidden_size, 1, bias=False))
 
     def forward(self,
@@ -75,9 +74,9 @@ class HeterogeneousGATLayer(nn.Module):
         attention = self.w(inputs)
         attention = torch.softmax(attention, dim=1)
         if require_weight:
-            return torch.mul(attention, inputs).sum(dim=1), attention.squeeze()
+            return (attention * inputs).sum(dim=1), attention.squeeze()
         else:
-            return torch.mul(attention, inputs).sum(dim=1)
+            return (attention * inputs).sum(dim=1)
 
 
 class hats(nn.Module):
@@ -92,7 +91,6 @@ class hats(nn.Module):
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,
-            dropout=0.1
         )
         self.upstream_gcn = GraphConvolution(
             in_features=hidden_size,
@@ -106,7 +104,7 @@ class hats(nn.Module):
         self.nn_upstream = nn.Linear(out_features, hidden_size)
         self.nn_downstream = nn.Linear(out_features, hidden_size)
 
-        self.pair_norm = PairNorm(mode='PN')
+        self.pair_norm = PairNorm(mode='PN-SCS')
         self.Heterogeneous_GAT = HeterogeneousGATLayer(hidden_size,
                                                        hidden_size)
         self.predictor = nn.Sequential(
@@ -119,13 +117,13 @@ class hats(nn.Module):
                 upstream_adj,
                 downstream_adj,
                 require_weight):
-        _, x = self.encoding(inputs)
-        x_upstream = self.upstream_gcn(x.squeeze(), upstream_adj,)
-        x_downstream = self.downstream_gcn(x.squeeze(), downstream_adj,)
-        x = self.nn_self(x.squeeze())
+        x, _ = self.encoding(inputs)
+        x_upstream = self.upstream_gcn(x[:, -1, :].squeeze(), upstream_adj,)
+        x_downstream = self.downstream_gcn(x[:, -1, :].squeeze(), downstream_adj,)
+        x = self.nn_self(x[:, -1, :].squeeze())
         x_upstream = self.nn_upstream(x_upstream)
         x_downstream = self.nn_downstream(x_downstream)
-        x = torch.stack((x, x_upstream, x_downstream), dim=1)
+        x = torch.stack((x.squeeze(), x_upstream, x_downstream), dim=1)
         x, heterogeneous_attention = self.Heterogeneous_GAT(x, require_weight)
         x = self.pair_norm(x)
         if require_weight:
