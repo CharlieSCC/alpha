@@ -1,5 +1,7 @@
 # Data, Factor, Model and Evaluate
 
+### Attention：
+
 ### Data
     All data must be BOD. 
     For the universe, if it changes at 2014-12, then it is named as xxx-2015.
@@ -33,4 +35,4 @@
 ### Evaluate
     - eval.py:            Basic Metrics for Finacial Prediction 
     - backtest.py:        Backtest for Model Signal
-    - attention_plot.py:  Attention Weights Plotting
+    - plot.py:            Plotting

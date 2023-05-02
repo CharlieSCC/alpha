@@ -178,7 +178,8 @@ class lstm_scheduler:
         stock_id_list = []
         date_list = []
         for x, y, date, stock_id in tqdm(test_dataloader):
-
+            if x.shape[1] == 0:
+                continue
             x = (x.squeeze() - torch.mean(x.squeeze(), dim=0, keepdim=True)) / (torch.std(x.squeeze(), dim=0, keepdim=True) + 1e-6)
             y_ = (y.squeeze() - torch.mean(y.squeeze()))/(torch.std(y.squeeze()) + 1e-6)
             if self.is_gpu:

@@ -119,6 +119,8 @@ class THGNN_scheduler:
                 self.logger.info("EPOCH {}: NUM PATIENCE {:.3f}".format(i, num_patience))
             if num_patience >= self.max_patience:
                 break
+        if not os.path.exists(os.path.join(DATA_PATH, self.name,)):
+            os.makedirs(os.path.join(DATA_PATH, self.name,))
         with open(os.path.join(DATA_PATH, self.name, "model_{}_{}.pkl").format(srt_date, end_date), "wb") as f:
             pickle.dump(best_model, f)
 
@@ -136,11 +138,11 @@ class THGNN_scheduler:
             x = (x.squeeze() - torch.mean(x.squeeze(), dim=0, keepdim=True)) / (torch.std(x.squeeze(), dim=0, keepdim=True) + 1e-6)
             y = (y.squeeze() - torch.mean(y.squeeze())) / (torch.std(y.squeeze()) + 1e-6)
             upstream = copy.deepcopy(graph.squeeze())
-            upstream[upstream <= 0] = 0
-            upstream[upstream > 0] = 1
+            upstream[upstream != 4] = 0
+            upstream[upstream == 4] = 1
             downstream = copy.deepcopy(graph.squeeze())
-            downstream[downstream >= 0] = 0
-            downstream[downstream < 0] = 1
+            downstream[downstream != -4] = 0
+            downstream[downstream == -4] = 1
             if self.is_gpu:
                 x = x.squeeze().cuda()
                 y = y.squeeze().cuda()
@@ -188,14 +190,16 @@ class THGNN_scheduler:
         stock_id_list = []
         date_list = []
         for x, y, graph, date, stock_id in tqdm(test_dataloader):
+            if x.shape[1] == 0:
+                continue
             x = (x.squeeze() - torch.mean(x.squeeze(), dim=0, keepdim=True)) / (torch.std(x.squeeze(), dim=0, keepdim=True) + 1e-6)
             y_ = (y.squeeze() - torch.mean(y.squeeze())) / (torch.std(y.squeeze()) + 1e-6)
             upstream = copy.deepcopy(graph.squeeze())
-            upstream[upstream <= 0] = 0
-            upstream[upstream > 0] = 1
+            upstream[upstream != 4] = 0
+            upstream[upstream == 4] = 1
             downstream = copy.deepcopy(graph.squeeze())
-            downstream[downstream >= 0] = 0
-            downstream[downstream < 0] = 1
+            downstream[downstream != -4] = 0
+            downstream[downstream == -4] = 1
             if self.is_gpu:
                 x = x.squeeze().cuda()
                 y_ = y_.squeeze().cuda()
@@ -203,6 +207,7 @@ class THGNN_scheduler:
                 downstream = downstream.cuda()
             y_pred, _ = best_model(x.float(), upstream.float(), downstream.float(), True)
             loss = self.loss_fn(y_.float(), y_pred)
+
             total_loss += loss.data
             ret_list.extend(y.squeeze().cpu().numpy().tolist())
             y_list.extend(y_.squeeze().detach().cpu().numpy().tolist())
@@ -220,6 +225,7 @@ class THGNN_scheduler:
         info_df["date"] = info_df["date"].astype(str).str[2:-3]
         info_df["stock_id"] = info_df["stock_id"].astype(str).str[2:-3]
         ic = info_df.groupby("date").apply(lambda dd: dd[["y", "y_pred"]].corr().loc["y", "y_pred"]).mean()
+        info_df.to_csv(os.path.join(DATA_PATH, self.name, "info_{}_{}.csv").format(srt_date, end_date))
         return total_loss/len(test_dataloader), ic, info_df
 
 

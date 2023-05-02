@@ -38,8 +38,15 @@ class GraphDataset(Dataset):
             # df = pd.read_hdf(os.path.join(DATA_PATH, "Ashare_data/factor_data/{}.h5".format(factor)), key="v")
             df = pd.read_hdf(os.path.join(DATA_PATH, "Ashare_data/factor_data/{}.h5".format(factor)), key=factor[-9:])
             df = df.fillna(method="ffill")
-            srt_idx = self.trade_dates.index[0] - self.look_back_window + 1
-            end_idx = self.trade_dates.index[-1] + 1
+            # srt_idx = self.trade_dates.index[0] - self.look_back_window + 1
+            # end_idx = self.trade_dates.index[-1] + 1
+            for i in range(len(df.index)):
+                if df.index[i] == self.trade_dates.iloc[0]:
+                    srt_idx = i - self.look_back_window + 1
+                elif df.index[i] == self.trade_dates.iloc[-1]:
+                    end_idx = i + 1
+                    break
+
             df = df.iloc[srt_idx:end_idx, :]
             arr_list.append(df.values)
         return np.stack(arr_list, axis=-1).transpose((1, 0, 2))

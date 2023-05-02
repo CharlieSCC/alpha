@@ -30,8 +30,7 @@ class GATLayer(nn.Module):
         if self.is_residual:
             self.residual = nn.Linear(in_features, out_features * num_heads)
 
-        if self.is_bias:
-            self.bias = nn.Parameter(torch.FloatTensor(1, out_features * num_heads))
+
 
     def forward(self, inputs, adj, require_weight=False):
         h = torch.mm(inputs, self.W)
@@ -40,6 +39,7 @@ class GATLayer(nn.Module):
         input_concat = torch.cat([h.repeat(1, N).view(N * N, -1), h.repeat(N, 1)], dim=1).view(N, -1,
                                                                                                2 * self.out_features,
                                                                                                self.num_heads)
+
         # [N, N, 2*out_features, num_heads]
         e = self.leaky_relu(torch.mul(input_concat, self.a).sum(-2).squeeze().permute(2, 0, 1, ))
         # [num_heads, N, N]
@@ -49,8 +49,7 @@ class GATLayer(nn.Module):
         # [num_heads, N, N]
         output_h = torch.matmul(attention, h.view(N, self.out_features, self.num_heads).permute(2, 0, 1, )).permute(1, 0, 2).reshape(N, -1)
 
-        if self.is_bias:
-            output_h = output_h + self.bias
+
         if self.is_residual:
             output_h = output_h + self.residual(inputs)
         if require_weight:
@@ -89,7 +88,6 @@ class HeterogeneousGATLayer(nn.Module):
                  hidden_size,):
         super(HeterogeneousGATLayer, self).__init__()
         self.w = nn.Sequential(nn.Linear(input_size, hidden_size),
-                               nn.Tanh(),
                                nn.Linear(hidden_size, 1, bias=False))
 
     def forward(self,
@@ -144,6 +142,7 @@ class THGNN(nn.Module):
                 downstream_adj,
                 require_weight):
         x, _ = self.encoding(inputs)
+
         x_upstream, attention_upstream = self.upstream_GAT(x[:, -1, :].squeeze(),
                                                            upstream_adj,
                                                            require_weight)
@@ -156,6 +155,7 @@ class THGNN(nn.Module):
         x = torch.stack((x, x_upstream, x_downstream), dim=1)
         x, heterogeneous_attention = self.Heterogeneous_GAT(x, require_weight)
         x = self.pair_norm(x)
+
         if require_weight:
             return self.predictor(x).squeeze(), (attention_upstream, attention_downstream, heterogeneous_attention)
         else:

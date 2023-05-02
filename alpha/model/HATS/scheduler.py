@@ -189,15 +189,17 @@ class hats_scheduler:
         stock_id_list = []
         date_list = []
         for x, y, graph, date, stock_id in tqdm(test_dataloader):
+            if x.shape[1] == 0:
+                continue
             x = (x.squeeze() - torch.mean(x.squeeze(), dim=0, keepdim=True)) / (
                         torch.std(x.squeeze(), dim=0, keepdim=True) + 1e-6)
             y_ = (y.squeeze() - torch.mean(y.squeeze())) / (torch.std(y.squeeze()) + 1e-6)
             upstream = copy.deepcopy(graph.squeeze())
-            upstream[upstream <= 0] = 0
-            upstream[upstream > 0] = 1
+            upstream[upstream != 4] = 0
+            upstream[upstream == 4] = 1
             downstream = copy.deepcopy(graph.squeeze())
-            downstream[downstream >= 0] = 0
-            downstream[downstream < 0] = 1
+            downstream[downstream != -4] = 0
+            downstream[downstream == -4] = 1
             if self.is_gpu:
                 x = x.squeeze().cuda()
                 y_ = y_.squeeze().cuda()
@@ -216,7 +218,8 @@ class hats_scheduler:
             "date": date_list,
             "stock_id": stock_id_list,
             "y": y_list,
-            "y_pred": y_pred_list
+            "y_pred": y_pred_list,
+            "ret": ret_list
         })
         info_df["date"] = info_df["date"].astype(str).str[2:-3]
         info_df["stock_id"] = info_df["stock_id"].astype(str).str[2:-3]

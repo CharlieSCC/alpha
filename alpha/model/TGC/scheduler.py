@@ -119,7 +119,9 @@ class TGC_scheduler:
                 self.logger.info("EPOCH {}: NUM PATIENCE {:.3f}".format(i, num_patience))
             if num_patience >= self.max_patience:
                 break
-        with open(os.path.join(DATA_PATH, self.name, "model_{}_{}").format(srt_date, end_date)) as f:
+        if not os.path.exists(os.path.join(DATA_PATH, self.name,)):
+            os.makedirs(os.path.join(DATA_PATH, self.name,))
+        with open(os.path.join(DATA_PATH, self.name, "model_{}_{}.pkl").format(srt_date, end_date), "wb") as f:
             pickle.dump(best_model, f)
 
     def train_epoch(self, model, loader, optimizer, mode):
@@ -134,8 +136,11 @@ class TGC_scheduler:
         date_list = []
         for x, y, graph, date, stock_id in tqdm(loader):
             y = (y.squeeze() - torch.mean(y.squeeze())) / torch.std(y.squeeze())
+            x = (x.squeeze() - torch.mean(x.squeeze(), dim=0, keepdim=True)) / (
+                    torch.std(x.squeeze(), dim=0, keepdim=True) + 1e-6)
             adj_matrix = copy.deepcopy(graph.squeeze())
-            adj_matrix[adj_matrix != 0] = 1
+            adj_matrix[~((adj_matrix == 4) & (adj_matrix == -4))] = 0
+            adj_matrix = adj_matrix / 4 + torch.eye(adj_matrix.shape[0])
             if self.is_gpu:
                 x = x.squeeze().cuda()
                 y = y.squeeze().cuda()
@@ -143,6 +148,7 @@ class TGC_scheduler:
             y_pred, _ = model(x.float(), adj_matrix.float(), True)
             loss = self.loss_fn(y.float(), y_pred)
             if mode == "train":
+                optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
             total_loss += loss.data
@@ -156,11 +162,13 @@ class TGC_scheduler:
             "y": y_list,
             "y_pred": y_pred_list
         })
+        info_df["date"] = info_df["date"].astype(str).str[2:-3]
+        info_df["stock_id"] = info_df["stock_id"].astype(str).str[2:-3]
         ic = info_df.groupby("date").apply(lambda dd: dd[["y", "y_pred"]].corr().loc["y", "y_pred"]).mean()
-        return total_loss / len(loader), ic
+        return total_loss/len(loader), ic
 
     def predict(self, srt_date, end_date):
-        with open(os.path.join(DATA_PATH, self.name, "model_{}_{}").format(srt_date, end_date)) as f:
+        with open(os.path.join(DATA_PATH, self.name, "model_{}_{}.pkl").format(srt_date, end_date), "rb") as f:
             best_model = pickle.load(f)
         test_dataset = GraphDataset(srt_date,
                                     end_date,
@@ -173,21 +181,28 @@ class TGC_scheduler:
             best_model.cuda()
         best_model.eval()
         total_loss = 0
+        ret_list = []
         y_list = []
         y_pred_list = []
         stock_id_list = []
         date_list = []
         for x, y, graph, date, stock_id in tqdm(test_dataloader):
-            y = (y.squeeze() - torch.mean(y.squeeze())) / torch.std(y.squeeze())
+            if x.shape[1] == 0:
+                continue
+            x = (x.squeeze() - torch.mean(x.squeeze(), dim=0, keepdim=True)) / (
+                    torch.std(x.squeeze(), dim=0, keepdim=True) + 1e-6)
+            y_ = (y.squeeze() - torch.mean(y.squeeze())) / (torch.std(y.squeeze()) + 1e-6)
             adj_matrix = copy.deepcopy(graph.squeeze())
-            adj_matrix[adj_matrix != 0] = 1
+            adj_matrix[~((adj_matrix == 4) & (adj_matrix == -4))] = 0
+            adj_matrix = adj_matrix / 4 + torch.eye(adj_matrix.shape[0])
             if self.is_gpu:
                 x = x.squeeze().cuda()
-                y = y.squeeze().cuda()
+                y_ = y_.squeeze().cuda()
                 adj_matrix = adj_matrix.cuda()
             y_pred, _ = best_model(x.float(), adj_matrix.float(), True)
-            loss = self.loss_fn(y.float(), y_pred)
+            loss = self.loss_fn(y_.float(), y_pred)
             total_loss += loss.data
+            ret_list.extend(y.squeeze().cpu().numpy().tolist())
             y_list.extend(y.squeeze().detach().cpu().numpy().tolist())
             y_pred_list.extend(y_pred.squeeze().detach().cpu().numpy().tolist())
             stock_id_list.extend(stock_id)
@@ -197,7 +212,12 @@ class TGC_scheduler:
             "date": date_list,
             "stock_id": stock_id_list,
             "y": y_list,
-            "y_pred": y_pred_list
+            "y_pred": y_pred_list,
+            "ret": ret_list
         })
+        info_df["date"] = info_df["date"].astype(str).str[2:-3]
+        info_df["stock_id"] = info_df["stock_id"].astype(str).str[2:-3]
         ic = info_df.groupby("date").apply(lambda dd: dd[["y", "y_pred"]].corr().loc["y", "y_pred"]).mean()
-        return total_loss / len(test_dataloader), ic, info_df
+        info_df.to_csv(os.path.join(DATA_PATH, self.name, "info_{}_{}.csv").format(srt_date, end_date))
+        return total_loss/len(test_dataloader), ic, info_df
+

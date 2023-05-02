@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+
 class GATLayer(nn.Module):
     def __init__(self,
                  in_features,
@@ -29,8 +30,7 @@ class GATLayer(nn.Module):
         if self.is_residual:
             self.residual = nn.Linear(in_features, out_features * num_heads)
 
-        if self.is_bias:
-            self.bias = nn.Parameter(torch.FloatTensor(1, out_features * num_heads))
+
 
     def forward(self, inputs, adj, require_weight=False):
         h = torch.mm(inputs, self.W)
@@ -39,6 +39,7 @@ class GATLayer(nn.Module):
         input_concat = torch.cat([h.repeat(1, N).view(N * N, -1), h.repeat(N, 1)], dim=1).view(N, -1,
                                                                                                2 * self.out_features,
                                                                                                self.num_heads)
+
         # [N, N, 2*out_features, num_heads]
         e = self.leaky_relu(torch.mul(input_concat, self.a).sum(-2).squeeze().permute(2, 0, 1, ))
         # [num_heads, N, N]
@@ -48,8 +49,7 @@ class GATLayer(nn.Module):
         # [num_heads, N, N]
         output_h = torch.matmul(attention, h.view(N, self.out_features, self.num_heads).permute(2, 0, 1, )).permute(1, 0, 2).reshape(N, -1)
 
-        if self.is_bias:
-            output_h = output_h + self.bias
+
         if self.is_residual:
             output_h = output_h + self.residual(inputs)
         if require_weight:
@@ -94,17 +94,15 @@ class TGC(nn.Module):
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,
-            dropout=0.1
         )
         self.GAT = GATLayer(
             in_features=hidden_size,
             out_features=out_features,
             num_heads=num_heads
         )
-        self.linear = nn.Linear(out_features * num_heads, hidden_size)
-        self.pair_norm = PairNorm(mode='PN')
+        self.pair_norm = PairNorm(mode='PN-SCS')
         self.predictor = nn.Sequential(
-            nn.Linear(hidden_size, 1),
+            nn.Linear(out_features*num_heads, 1),
             # nn.Sigmoid()
         )
 
@@ -112,9 +110,8 @@ class TGC(nn.Module):
                 inputs,
                 adj_matrix,
                 require_weight):
-        _, x = self.encoding(inputs)
-        x, att = self.GAT(x.squeeze(), adj_matrix, require_weight)
-        x = self.linear(x)
+        x, _ = self.encoding(inputs)
+        x, att = self.GAT(x[:, -1, :].squeeze(), adj_matrix, require_weight)
         x = self.pair_norm(x)
         if require_weight:
             return self.predictor(x).squeeze(), att

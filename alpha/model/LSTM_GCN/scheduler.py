@@ -185,11 +185,13 @@ class lstm_gcn_scheduler:
         stock_id_list = []
         date_list = []
         for x, y, graph, date, stock_id in tqdm(test_dataloader):
+            if x.shape[1] == 0:
+                continue
             x = (x.squeeze() - torch.mean(x.squeeze(), dim=0, keepdim=True)) / (torch.std(x.squeeze(), dim=0, keepdim=True) + 1e-6)
             y_ = (y.squeeze() - torch.mean(y.squeeze())) / (torch.std(y.squeeze()) + 1e-6)
             adj_matrix = copy.deepcopy(graph.squeeze())
-            adj_matrix[adj_matrix != 0] = 1
-            adj_matrix = adj_matrix + torch.eye(adj_matrix.shape[0])
+            adj_matrix[~((adj_matrix == 4) & (adj_matrix == -4))] = 0
+            adj_matrix = adj_matrix/4 + torch.eye(adj_matrix.shape[0])
             if self.is_gpu:
                 x = x.squeeze().cuda()
                 y_ = y_.squeeze().cuda()
@@ -213,4 +215,5 @@ class lstm_gcn_scheduler:
         info_df["date"] = info_df["date"].astype(str).str[2:-3]
         info_df["stock_id"] = info_df["stock_id"].astype(str).str[2:-3]
         ic = info_df.groupby("date").apply(lambda dd: dd[["y", "y_pred"]].corr().loc["y", "y_pred"]).mean()
+        info_df.to_csv(os.path.join(DATA_PATH, self.name, "info_{}_{}.csv").format(srt_date, end_date))
         return total_loss / len(test_dataloader), ic, info_df
