@@ -1,3 +1,4 @@
+import alphalens
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.dates import AutoDateLocator, AutoDateFormatter
@@ -38,6 +39,7 @@ def plot_net_value(profit_series_list, labels, fig_size=(20, 5), title='Net Valu
 
 
 if __name__ == "__main__":
+    # ===================================pnl plot===============================================
     b = BackTest(1000000, 0.00, 0.00)
 
     hats = pd.read_csv("/home/chencheng/hats_0.0.1/info_20210101_20221231.csv", index_col=0)
@@ -52,3 +54,19 @@ if __name__ == "__main__":
     zz800.index = pd.to_datetime(zz800.index, format="%Y%m%d")
 
     plot_net_value([ret_hats, ret_gru, zz800], ["HATS", "GRU", "CSI800"])
+
+    # ===================================signal plot===============================================
+    factor = hats[["date", "stock_id", "y_pred"]]
+    factor["date"] = pd.to_datetime(factor["date"], format="%Y%m%d")
+    factor.columns = ["date", "asset", "y_pred"]
+    factor = factor.set_index(["date", "asset"])["y_pred"]
+
+    ret = gru[["date", "stock_id", "ret"]]
+    ret["date"] = pd.to_datetime(ret["date"], format="%Y%m%d")
+    ret.columns = ["date", "asset", "ret"]
+    ret = ret.set_index(["date", "asset"])
+    ret.columns = ["1D"]
+
+    df = alphalens.utils.get_clean_factor(factor, ret, quantiles=5)
+    alphalens.tears.create_full_tear_sheet(df)
+
