@@ -43,3 +43,9 @@
     - eval.py:            Basic Metrics for Finacial Prediction 
     - backtest.py:        Backtest for Model Signal
     - plot.py:            Plotting
+    
+Credits
+-------
+
+-  `Xiang Sheng <https://github.com/a-campbell>`
+-  `Zhikang Xu <https://github.com/a-campbell>`
