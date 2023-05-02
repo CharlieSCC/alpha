@@ -5,9 +5,9 @@
     
     这个项目的证书是GPL3，意味着无论以何种方式修改或者使用代码，都需要开源。    
     
-    Do not close the source after modification.
+    Do not close the source after modification. Failure to do so will result in legal liability。
 
-    请不要修改后闭源。    
+    请不要修改后闭源。否则将带来法律上的责任。
 
 ### Data
     All data must be BOD. 
