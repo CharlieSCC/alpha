@@ -1,6 +1,13 @@
 # Data, Factor, Model and Evaluate
 
-### Attention：
+### Attention
+    The LICENSE of the project is GPL3, which means No matter how you modify or use code, you need to open source it.
+    
+    这个项目的证书是GPL3，意味着无论以何种方式修改或者使用代码，都需要开源。    
+    
+    Do not close the source after modification.
+
+    请不要修改后闭源。    
 
 ### Data
     All data must be BOD. 
