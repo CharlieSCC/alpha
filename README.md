@@ -47,5 +47,5 @@
 Credits
 -------
 
--  `Xiang Sheng <[https://github.com/a-campbell](https://github.com/xiangsheng1325)>`
--  `Zhikang Xu <[https://github.com/a-campbell](https://github.com/DVINSION)>`
+-  `Xiang Sheng (https://github.com/xiangsheng1325)`
+-  `Zhikang Xu (https://github.com/DVINSION)`
