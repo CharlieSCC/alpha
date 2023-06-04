@@ -95,7 +95,7 @@ class hats_scheduler:
                                      self.universe_version)
         train_dataloader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         valid_dataloader = DataLoader(valid_dataset, batch_size=self.batch_size, shuffle=False)
-        model = hats(len(self.factor_list), self.hidden_size, self.mum_layers, self.out_features,)
+        model = hats(len(self.factor_list), self.hidden_size, self.mum_layers, self.out_features, )
         if self.is_gpu:
             model.cuda()
         optimizer = torch.optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
